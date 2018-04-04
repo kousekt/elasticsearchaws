@@ -1,0 +1,70 @@
+﻿'use strict';
+
+/* 
+https://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html 
+1. Install this in your local dir with this index.js file.
+2. refer to https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/about.html
+3. npm install --save elasticsearch
+4. zip up your dir with node_modules and index.js in it
+5. upload the zip file
+*/
+
+var elasticsearch = require('elasticsearch');
+var client = new elasticsearch.Client({
+    host: ' your elastic search cluster url here '
+    //log: 'trace'
+});
+
+exports.handler = (event, context, callback) => {
+    //console.log('Received event:', JSON.stringify(event, null, 2));
+    const rawMessageStr = event.Records[0].Sns.Message;
+    console.log('From SNS:', rawMessageStr);
+    var message = JSON.parse(rawMessageStr);
+    
+    
+    //var message = event;
+    //console.log(message);
+    
+    postDocumentToElasticSearch(message, context, callback);
+};
+
+function postDocumentToElasticSearch(message, context, callback) {
+    
+    client.index({
+        index: 'contentdb',
+        type: '2',  // Pull the Source ID out of the DB
+        id: message.id,
+       
+        body: {
+            title: message.title,
+            tags: message.tags,
+            media: message.media,
+            content: message.content
+        }
+    }, function (error, response) {
+        if (error) {
+            console.log('err' + error);
+            callback(error, 'error has occurred');
+        }
+        else {
+            console.log('success' + response);
+            callback(null, response);
+        }
+    });
+}
+
+/*
+Use this to test. This is what Umbraco should publish to the SNS topic.
+
+{
+    "id": 40,
+    "title": "updated this",
+    "tags": [
+        "tag1",
+        "Another tag in the upsert"
+    ],
+    "content": "this is the updated content duper duper duper",
+    "media": "this is media"
+}
+
+*/
